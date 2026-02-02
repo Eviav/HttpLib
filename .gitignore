@@ -1,4 +1,4 @@
-﻿# Build and Release Folders
+# Build and Release Folders
 bin-debug/
 bin-release/
 [Oo]bj/
@@ -16,6 +16,9 @@ bin-release/
 *.vcxproj.user
 *.pubxml.user
 
+# Projects
 /.vs
+/.claude
 /packages
-/nuget*
+*.snk
+build.log
