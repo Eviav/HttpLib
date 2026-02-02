@@ -25,6 +25,14 @@
 
 类似图片加载场景，同一个id的图片通过磁盘存储减少网络开支
 
+#### 多线程下载
+
+支持多线程分段下载，提高下载速度
+
+#### 下载管理
+
+支持暂停、恢复下载，下载速度和时间估算
+
 
 ****
 
@@ -51,6 +59,10 @@
 * [实例流式传输](#实例流式传输)
 * [实例获取域名IP](#实例获取域名IP)
 * [实例全局错误捕获](#实例全局错误捕获)
+* [多线程下载](#多线程下载)
+    * [基本用法](#多线程下载基本用法)
+    * [高级选项](#多线程下载高级选项)
+    * [下载状态与监控](#下载状态与监控)
 * [ResultResponse介绍](#ResultResponse介绍)
 
 
@@ -168,19 +180,17 @@ before((HttpWebResponse response, ResultResponse result) =>
 >字节大小
 #### 上传
 ``` csharp
-requestProgres((bytesSent, totalBytes) => {
-	double prog = (bytesSent * 1.0) / (totalBytes * 1.0);
-	Console.Write("{0}% 上传", Math.Round(prog * 100.0, 1).ToString("N1"));
+uploadProgress(e => {
+    Console.Write("{0}% 上传", Math.Round(e.Prog * 100.0, 1).ToString("N1"));
 })
 ```
 #### 下载
 ``` csharp
-responseProgres((bytesSent, totalBytes) => {
-	if (totalBytes > 0)
-	{
-		double prog = (bytesSent * 1.0) / (totalBytes * 1.0);
-		Console.Write("{0}% 下载", Math.Round(prog * 100.0, 1).ToString("N1"));
-	}
+downloadProgress(e => {
+    if (e.GetProg(out var prog))
+    {
+        Console.Write("{0}% 下载", Math.Round(prog * 100.0, 1).ToString("N1"));
+    }
 })
 ```
 
@@ -201,7 +211,7 @@ download("保存目录", "保存文件名称（为空自动获取）");//下载�
 # 实例
 
 ``` csharp
-string result = Http.Get("https://www.baidu.com/s")
+string? result = Http.Get("https://www.baidu.com/s")
 .data(new { wd = "GitHub - Haku-Men HttpLib", params_ = "关键字参数" })
 .redirect()
 .request();
@@ -211,20 +221,19 @@ Console.Write(result);
 # 实例下载文件
 ``` csharp
 var savapath = Http.Get("https://dldir1.qq.com/qqfile/qq/QQNT/Windows/QQ_9.9.9_240422_x64_01.exe")
-       .redirect()
-       .responseProgres((bytesSent, totalBytes) =>
-       {
-           Console.SetCursorPosition(0, 0);
-           if (totalBytes > 0)
-           {
-               double prog = (bytesSent * 1.0) / (totalBytes * 1.0);
-               Console.Write("{0}% 下载 {1}/{2}                  ", Math.Round(prog * 100.0, 1).ToString("N1"), CountSize(bytesSent), CountSize(totalBytes));
-           }
-           else
-           {
-               Console.Write("{0} 下载            ", CountSize(bytesSent));
-           }
-       }).download(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "qq.exe");
+    .redirect()
+    .downloadProgress(e =>
+    {
+        Console.SetCursorPosition(0, 0);
+        if (e.GetProg(out var prog))
+        {
+            Console.Write("{0}% 下载 {1}/{2}                  ", Math.Round(prog * 100.0, 1).ToString("N1"), CountSize(e.Value), CountSize(e.MaxValue));
+        }
+        else
+        {
+            Console.Write("{0} 下载            ", CountSize(e.Value));
+        }
+    }).download(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "qq.exe");
 if (savapath != null) Console.WriteLine("下载成功保存至:" + savapath);
 else Console.WriteLine("下载失败");
 ```
@@ -249,9 +258,96 @@ Http.Get("https://www.baidu.com").IP
 Config.fail += (HttpCore core, ResultResponse result)=>
 {
     if (result.Exception == null) return;
-    Console.Write(err.GetType());
-    Console.Write(err.Message);
+    Console.Write(result.Exception.GetType());
+    Console.Write(result.Exception.Message);
 };
+```
+
+# 多线程下载
+
+## 多线程下载基本用法
+
+### 简单下载
+``` csharp
+var downloader = Http.Get("https://dldir1.qq.com/qqfile/qq/QQNT/Windows/QQ_9.9.9_240422_x64_01.exe")
+    .downLoad(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+
+string? savePath = await downloader.Go();
+if (savePath != null) Console.WriteLine("下载成功保存至: " + savePath);
+else Console.WriteLine("下载失败");
+```
+
+### 自定义线程数
+``` csharp
+var downloader = Http.Get("https://example.com/large-file.zip")
+    .downLoad(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+
+// 使用 8 线程下载
+string? savePath = await downloader.Go(8);
+```
+
+### 自定义文件名
+``` csharp
+var downloader = Http.Get("https://example.com/file.zip")
+    .downLoad(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+
+// 自定义保存文件名
+string? savePath = await downloader.Go("custom-name.zip");
+```
+
+## 多线程下载高级选项
+
+### 完整控制
+``` csharp
+var downloader = Http.Get("https://example.com/large-file.zip")
+    .downLoad(Environment.GetFolderPath(Environment.SpecialFolder.Desktop))
+    .SetRetryCount(3)  // 设置重试次数
+    .SetCacheSize(8192);  // 设置缓存大小
+
+string? savePath = await downloader.Go(4, "my-file.zip");
+```
+
+## 下载状态与监控
+
+### 监控下载进度
+``` csharp
+var downloader = Http.Get("https://dldir1.qq.com/qqfile/qq/QQNT/Windows/QQ_9.9.9_240422_x64_01.exe")
+    .downLoad(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+
+// 监控下载进度
+downloader.ValueChange(progress =>
+{
+    Console.SetCursorPosition(0, 0);
+    Console.WriteLine($"下载进度: {downloader.Prog * 100:F1}%" +
+                      $" 速度: {downloader.Speed}/s" +
+                      $" 剩余时间: {downloader.Time}");
+});
+
+// 监控下载状态变化
+downloader.StateChange((t, err) =>
+{
+    Console.WriteLine($"下载状态: {t}");
+});
+
+string? savePath = await downloader.Go();
+```
+
+### 暂停与恢复下载
+``` csharp
+var downloader = Http.Get("https://example.com/large-file.zip")
+    .downLoad(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
+
+// 开始下载
+var downloadTask = downloader.Go();
+
+// 暂停下载
+downloader.Suspend();
+
+// 恢复下载
+downloader.Resume();
+
+// 等待下载完成
+string? savePath = await downloadTask;
 ```
 
 # ResultResponse介绍

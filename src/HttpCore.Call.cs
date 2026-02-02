@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 
 namespace HttpLib
@@ -9,16 +9,34 @@ namespace HttpLib
 
         #region 上传进度的回调
 
-        Action<long, long> _requestProgres = null;
-        Action<long> _requestProgresMax = null;
+        Action<Progress>? onUploadProgress;
         /// <summary>
         /// 上传进度的回调函数
         /// </summary>
+        public HttpCore uploadProgress(Action<Progress> action)
+        {
+            onUploadProgress = action;
+            return this;
+        }
+
+        #region 过期
+
+        Action<long, long> _requestProgres;
+        Action<long> _requestProgresMax;
+        /// <summary>
+        /// 上传进度的回调函数
+        /// </summary>
+        [Obsolete("use uploadProgress")]
         public HttpCore requestProgres(Action<long, long> action)
         {
             _requestProgres = action;
             return this;
         }
+
+        /// <summary>
+        /// 上传进度的回调函数
+        /// </summary>
+        [Obsolete]
         public HttpCore requestProgresMax(Action<long> action)
         {
             _requestProgresMax = action;
@@ -27,13 +45,28 @@ namespace HttpLib
 
         #endregion
 
+        #endregion
+
         #region 下载进度的回调
 
-        Action<long, long> _responseProgres = null;
-        Action<long> _responseProgresMax = null;
+        Action<Progress>? onDownloadProgress;
         /// <summary>
         /// 下载进度的回调函数
         /// </summary>
+        public HttpCore downloadProgress(Action<Progress> action)
+        {
+            onDownloadProgress = action;
+            return this;
+        }
+
+        #region 过期
+
+        Action<long, long> _responseProgres;
+        Action<long> _responseProgresMax;
+        /// <summary>
+        /// 下载进度的回调函数
+        /// </summary>
+        [Obsolete("use downloadProgress")]
         public HttpCore responseProgres(Action<long, long> action)
         {
             _responseProgres = action;
@@ -43,6 +76,7 @@ namespace HttpLib
         /// <summary>
         /// 下载进度的回调函数
         /// </summary>
+        [Obsolete]
         public HttpCore responseProgresMax(Action<long> action)
         {
             _responseProgresMax = action;
@@ -53,16 +87,18 @@ namespace HttpLib
 
         #endregion
 
+        #endregion
+
         #region 请求
 
-        Action<HttpWebRequest> action_Request = null;
+        Action<HttpWebRequest> action_Request;
         public HttpCore webrequest(Action<HttpWebRequest> action)
         {
             action_Request = action;
             return this;
         }
 
-        Func<HttpWebResponse, ResultResponse, bool> action_before = null;
+        Func<HttpWebResponse, ResultResponse, bool> action_before;
         /// <summary>
         /// 请求之前处理
         /// </summary>
@@ -74,7 +110,7 @@ namespace HttpLib
             return this;
         }
 
-        Action<ResultResponse> action_fail = null;
+        Action<ResultResponse> action_fail;
         /// <summary>
         /// 接口调用失败的回调函数
         /// </summary>
@@ -118,5 +154,37 @@ namespace HttpLib
         }
 
         #endregion
+    }
+
+    public class Progress
+    {
+        public Progress() { }
+        public Progress(long value, long max)
+        {
+            Value = value;
+            MaxValue = max;
+        }
+
+        public long Value { get; set; }
+        public long MaxValue { get; set; }
+
+        public bool GetProg(out float value)
+        {
+            if (MaxValue > 0)
+            {
+                value = Prog;
+                return true;
+            }
+            else
+            {
+                value = 0;
+                return false;
+            }
+        }
+
+        public long bytesSent => Value;
+        public long totalBytes => MaxValue;
+
+        public float Prog => Value * 1F / MaxValue;
     }
 }

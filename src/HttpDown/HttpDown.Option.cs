@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -42,28 +42,57 @@ namespace HttpLib
         /// <summary>
         /// 下载速度
         /// </summary>
-        public double Speed { get => _Speed; }
+        public double Speed => _Speed;
 
         /// <summary>
         /// 剩余时间
         /// </summary>
-        public string? Time { get => _Time; }
+        public string? Time => _Time;
 
         /// <summary>
         /// 当前下载值
         /// </summary>
-        public long Value { get => _Value; }
+        public long Value => _Value;
 
         /// <summary>
         /// 文件大小
         /// </summary>
-        public long MaxValue { get => _MaxValue; }
+        public long MaxValue => _MaxValue;
+
+        /// <summary>
+        /// 当前下载进度
+        /// </summary>
+        public float Prog => _Value * 1F / _MaxValue;
 
         /// <summary>
         /// 任务状态
         /// </summary>
-        public DownState State { get => _State; }
+        public DownState State => _State;
 
+        #region 设置
+
+        public HttpDown SetID(string? value)
+        {
+            ID = value;
+            return this;
+        }
+        public HttpDown SetRetryCount(int value)
+        {
+            RetryCount = value;
+            return this;
+        }
+        public HttpDown SetCacheSize(int value)
+        {
+            CacheSize = value;
+            return this;
+        }
+        public HttpDown SetTimeOut(int value)
+        {
+            TimeOut = value;
+            return this;
+        }
+
+        #endregion
 
         #region 非公开
 

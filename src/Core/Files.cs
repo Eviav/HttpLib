@@ -1,28 +1,33 @@
-﻿using System.IO;
+using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace HttpLib
 {
     /// <summary>
-    /// 文件
+    /// HTTP 请求文件
     /// </summary>
-    public class Files
+    public class Files : IDisposable
     {
         /// <summary>
         /// 参数名称
         /// </summary>
         public string Name { get; set; }
+
         /// <summary>
         /// 文件名
         /// </summary>
         public string FileName { get; set; }
+
         /// <summary>
         /// 文件类型
         /// </summary>
         public string ContentType { get; set; }
+
         /// <summary>
         /// 文件流
         /// </summary>
-        public Stream Stream { get; set; }
+        public Stream Stream { get; private set; }
 
         /// <summary>
         /// 文件大小
@@ -74,5 +79,36 @@ namespace HttpLib
         /// </summary>
         /// <param name="fullName">文件路径</param>
         public Files(string fullName) : this("file", fullName) { }
+
+        /// <summary>
+        /// 释放资源
+        /// </summary>
+        public void Dispose()
+        {
+            Stream?.Dispose();
+            Stream = null!;
+        }
+    }
+
+    class Seg
+    {
+        List<object> data;
+        public Seg(int len)
+        {
+            data = new List<object>(len);
+        }
+        public long Add(byte[] bytes)
+        {
+            data.Add(bytes);
+            return bytes.Length;
+        }
+        public long Add(byte[] bytes, Files file)
+        {
+            data.Add(bytes);
+            data.Add(file);
+            return bytes.Length + file.Size;
+        }
+
+        public object[] List => data.ToArray();
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 
@@ -74,7 +74,18 @@ namespace HttpLib
         /// <param name="url">地址</param>
         public static HttpCore Delete(this Uri url) => Core(url, HttpMethod.Delete);
 
+        /// <summary>
+        /// 创建 HTTP 请求核心实例
+        /// </summary>
+        /// <param name="url">地址</param>
+        /// <param name="method">请求方法</param>
         public static HttpCore Core(this string url, HttpMethod method) => new HttpCore(url, method);
+
+        /// <summary>
+        /// 创建 HTTP 请求核心实例
+        /// </summary>
+        /// <param name="url">地址</param>
+        /// <param name="method">请求方法</param>
         public static HttpCore Core(this Uri url, HttpMethod method) => new HttpCore(url, method);
 
         #region 缓存
@@ -177,7 +188,7 @@ namespace HttpLib
         /// <summary>
         /// 指示HTTP响应是否成功 range 200-299
         /// </summary>
-        public bool IsSuccessStatusCode { get => StatusCode >= 200 && StatusCode <= 299; }
+        public bool IsSuccessStatusCode => StatusCode >= 200 && StatusCode <= 299;
 
         /// <summary>
         /// 状态代码

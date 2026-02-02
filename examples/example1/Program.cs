@@ -1,4 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
+// See https://aka.ms/new-console-template for more information
 
 using HttpLib;
 
@@ -42,27 +42,24 @@ var a2 = Http.Post("http://localhost:61489/api/values").header(headers)
     .data(new List<Files> { new Files(@"C:\Users\ttgx\Desktop\ABT44B9D51AC6E96DA9220E39EED30D1945666375E8401AD7DE974193FD48211E72.jfif") })
     .data(new Val("abc", "123"))
     .data(new Val("abc1", "1234"))
-    .requestProgres((bytesSent, totalBytes) =>
+    .uploadProgress(e =>
     {
-        double prog = (bytesSent * 1.0) / (totalBytes * 1.0);
-
         int top = 0;
         Console.SetCursorPosition(0, top);
-        Console.Write("{0}% 上传 {1}/{2}            ", Math.Round(prog * 100.0, 1).ToString("N1"), CountSize(bytesSent), CountSize(totalBytes));
+        Console.Write("{0}% 上传 {1}/{2}            ", Math.Round(e.Prog * 100.0, 1).ToString("N1"), CountSize(e.Value), CountSize(e.MaxValue));
 
     })
-    .responseProgres((bytesSent, totalBytes) =>
+    .downloadProgress(e =>
     {
         int top = 2;
         Console.SetCursorPosition(0, top);
-        if (totalBytes > 0)
+        if (e.GetProg(out var prog))
         {
-            double prog = (bytesSent * 1.0) / (totalBytes * 1.0);
-            Console.Write("{0}% 下载 {1}/{2}                  ", Math.Round(prog * 100.0, 1).ToString("N1"), CountSize(bytesSent), CountSize(totalBytes));
+            Console.Write("{0}% 下载 {1}/{2}                  ", Math.Round(prog * 100.0, 1).ToString("N1"), CountSize(e.Value), CountSize(e.MaxValue));
         }
         else
         {
-            Console.Write("{0} 下载            ", CountSize(bytesSent));
+            Console.Write("{0} 下载            ", CountSize(e.Value));
         }
     }).fail(result =>
     {

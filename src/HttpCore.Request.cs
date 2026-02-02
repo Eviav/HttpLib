@@ -1,8 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -87,7 +86,7 @@ namespace HttpLib
             return val.str;
         }
 
-        Action<string?>? action_eventstream = null;
+        Action<string?>? action_eventstream;
         /// <summary>
         /// 流式请求（返回字符串）
         /// </summary>
@@ -113,7 +112,7 @@ namespace HttpLib
         #region 对象
 
         HttpWebRequest? req;
-        HttpWebResponse? response = null;
+        HttpWebResponse? response;
 
         #endregion
 
@@ -374,9 +373,10 @@ namespace HttpLib
         /// <summary>
         /// 获取域名IP
         /// </summary>
-        public string? IP { get => option.IP; }
+        public string? IP => option.IP;
 
-        public long Val = 0, Max = 0;
+        public long Val { get; private set; }
+        public long Max { get; private set; }
 
         byte[]? DownStream(long response_max, ResultResponse _web, Stream stream, out string? outfile, string? savePath = null, string? saveName = null)
         {
@@ -401,13 +401,25 @@ namespace HttpLib
             using (stream_read)
             {
                 byte[] buffer = new byte[Config.CacheSize];
-                if (_responseProgres == null)
+                if (onDownloadProgress == null && _responseProgres == null)
                 {
                     int rsize = 0;
                     while ((rsize = stream.Read(buffer, 0, buffer.Length)) > 0)
                     {
                         stream_read.Write(buffer, 0, rsize);
                         response_val += rsize;
+                        Val = response_val;
+                    }
+                }
+                else if (onDownloadProgress != null)
+                {
+                    onDownloadProgress(new Progress(response_val, response_max));
+                    int rsize = 0;
+                    while ((rsize = stream.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        stream_read.Write(buffer, 0, rsize);
+                        response_val += rsize;
+                        onDownloadProgress(new Progress(response_val, response_max));
                         Val = response_val;
                     }
                 }
@@ -556,155 +568,267 @@ namespace HttpLib
             if (Config.headers != null && Config.headers.Count > 0) SetHeader(out setContentType, req, Config.headers, cookies);
             if (option.header != null && option.header.Count > 0) SetHeader(out setContentType, req, option.header, cookies);
 
+            if (option.method == HttpMethod.Get || option.method == HttpMethod.Head) return req;
+
             #region 准备上传数据
 
-            if (option.method != HttpMethod.Get && option.method != HttpMethod.Head)
+            if (!string.IsNullOrEmpty(option.datastr)) UpText(req, encoding, option.datastr!, setContentType);
+            else if (option.file != null && option.file.Count > 0) UpMultipart(req, encoding, option.file);
+            else if (option.data != null && option.data.Count > 0) UpFormUrlencoded(req, encoding, option.data, setContentType);
+
+            #endregion
+
+            return req;
+        }
+
+        /// <summary>
+        /// 上传文本数据
+        /// </summary>
+        /// <param name="req">HTTP请求对象</param>
+        /// <param name="encoding">编码方式</param>
+        /// <param name="data">要上传的文本数据</param>
+        /// <param name="setContentType">是否需要设置Content-Type头</param>
+        /// <remarks>
+        /// 此方法用于上传纯文本数据，默认设置Content-Type为text/plain。
+        /// 实现原理：
+        /// 1. 检查是否需要设置Content-Type头
+        /// 2. 将文本数据转换为字节数组
+        /// 3. 调用UpCore方法执行实际的上传操作
+        /// </remarks>
+        void UpText(HttpWebRequest req, Encoding encoding, string data, bool setContentType)
+        {
+            if (setContentType) req.ContentType = "text/plain";
+            UpCore(req, encoding.GetBytes(data));
+        }
+        /// <summary>
+        /// 上传表单数据（application/x-www-form-urlencoded格式）
+        /// </summary>
+        /// <param name="req">HTTP请求对象</param>
+        /// <param name="encoding">编码方式</param>
+        /// <param name="data">要上传的表单数据列表</param>
+        /// <param name="setContentType">是否需要设置Content-Type头</param>
+        /// <remarks>
+        /// 此方法用于上传表单数据，使用application/x-www-form-urlencoded格式。
+        /// 实现原理：
+        /// 1. 检查是否需要设置Content-Type头
+        /// 2. 遍历表单数据，对每个键值对进行URL编码
+        /// 3. 将编码后的键值对用&连接成字符串
+        /// 4. 将字符串转换为字节数组
+        /// 5. 调用UpCore方法执行实际的上传操作
+        /// </remarks>
+        void UpFormUrlencoded(HttpWebRequest req, Encoding encoding, List<Val> data, bool setContentType)
+        {
+            if (setContentType) req.ContentType = "application/x-www-form-urlencoded";
+            var param_ = new List<string>(data.Count);
+            foreach (var it in data)
             {
-                if (!string.IsNullOrEmpty(option.datastr))
-                {
-                    if (setContentType) req.ContentType = "text/plain";
+                if (it.Value == null) continue;
+                param_.Add(it.ToStringEscape());
+            }
 
-                    var bs = encoding.GetBytes(option.datastr);
-                    req.ContentLength = bs.Length;
-                    using (var stream = req.GetRequestStream())
-                    {
-                        stream.Write(bs, 0, bs.Length);
-                    }
+            UpCore(req, encoding.GetBytes(string.Join("&", param_)));
+        }
+        /// <summary>
+        /// 上传多部分表单数据（multipart/form-data格式），支持文件和表单字段
+        /// </summary>
+        /// <param name="req">HTTP请求对象</param>
+        /// <param name="encoding">编码方式</param>
+        /// <param name="files">要上传的文件列表</param>
+        /// <remarks>
+        /// 此方法用于上传多部分表单数据，支持同时上传文件和普通表单字段。
+        /// 实现原理：
+        /// 1. 生成随机边界字符串
+        /// 2. 设置Content-Type头为multipart/form-data格式，并包含边界字符串
+        /// 3. 准备上传数据的各个部分（边界标记、文件数据、表单字段等）
+        /// 4. 计算总上传大小
+        /// 5. 调用UpMultipartCore方法执行实际的上传操作，支持进度回调
+        /// </remarks>
+        void UpMultipart(HttpWebRequest req, Encoding encoding, List<Files> files)
+        {
+            string boundary = 8.RandomString();
+            req.ContentType = "multipart/form-data; boundary=" + boundary;
+
+            byte[] startbyteOnes = encoding.GetBytes("--" + boundary + "\r\n"),
+                startbytes = encoding.GetBytes("\r\n--" + boundary + "\r\n"),
+                endbytes = encoding.GetBytes("\r\n--" + boundary + "--\r\n");
+
+            int count = 0;
+            long size = 0;
+            if (option.data == null || option.data.Count == 0)
+            {
+                var write = new Seg(files.Count * 3 + 1);
+
+                #region 规划文件大小
+
+                foreach (var file in files)
+                {
+                    if (count == 0) size += write.Add(startbyteOnes);
+                    else size += write.Add(startbytes);
+                    count++;
+                    string separator = string.Format("Content-Disposition: form-data; name=\"{0}\"; filename=\"{1}\"\r\nContent-Type: {2}\r\n\r\n", file.Name, file.FileName, file.ContentType);
+                    size += write.Add(encoding.GetBytes(separator), file);
                 }
-                else if (option.file != null && option.file.Count > 0)
+                size += write.Add(endbytes);
+
+                #endregion
+
+                UpMultipartCore(req, size, write.List);
+            }
+            else
+            {
+                var write = new Seg((option.data.Count * 2) + (files.Count * 3 + 1));
+
+                #region 规划文件大小
+
+                foreach (var it in option.data)
                 {
-                    string boundary = 8.RandomString();
-                    req.ContentType = "multipart/form-data; boundary=" + boundary;
+                    if (it.Value == null) continue;
+                    if (count == 0) size += write.Add(startbyteOnes);
+                    else size += write.Add(startbytes);
+                    count++;
+                    string separator = string.Format("Content-Disposition: form-data; name=\"{0}\"\r\n\r\n{1}", it.Key, it.Value);
+                    size += write.Add(encoding.GetBytes(separator));
+                }
 
-                    byte[] startbyteOnes = encoding.GetBytes("--" + boundary + "\r\n"),
-                        startbytes = encoding.GetBytes("\r\n--" + boundary + "\r\n"),
-                        endbytes = encoding.GetBytes("\r\n--" + boundary + "--\r\n");
+                foreach (var file in files)
+                {
+                    if (count == 0) size += write.Add(startbyteOnes);
+                    else size += write.Add(startbytes);
+                    count++;
+                    string separator = string.Format("Content-Disposition: form-data; name=\"{0}\"; filename=\"{1}\"\r\nContent-Type: {2}\r\n\r\n", file.Name, file.FileName, file.ContentType);
+                    size += write.Add(encoding.GetBytes(separator), file);
+                }
+                size += write.Add(endbytes);
 
-                    var writeDATA = new List<byte[]?>((option.data == null ? 0 : option.data.Count * 2) + option.file.Count * 3 + 1);
+                #endregion
 
-                    int countB = 0;
+                UpMultipartCore(req, size, write.List);
+            }
+        }
+        /// <summary>
+        /// 多部分表单数据上传核心方法，支持进度回调
+        /// </summary>
+        /// <param name="req">HTTP请求对象</param>
+        /// <param name="size">总上传大小</param>
+        /// <param name="data">上传数据数组，包含文件流和字节数组</param>
+        /// <remarks>
+        /// 此方法是多部分表单数据上传的核心实现，负责将数据写入请求流并触发进度回调。
+        /// 优化点：
+        /// 1. 减少重复代码，统一处理不同类型的进度回调
+        /// 2. 优化进度计算和更新逻辑
+        /// 3. 提高代码可读性和维护性
+        /// </remarks>
+        void UpMultipartCore(HttpWebRequest req, long size, object[] data)
+        {
+            req.ContentLength = size;
 
-                    #region 规划文件大小
+            #region 注入进度
 
-                    if (option.data != null && option.data.Count > 0)
+            _requestProgresMax?.Invoke(size);
+            using (var stream = req.GetRequestStream())
+            {
+                if (onUploadProgress == null && _requestProgres == null)
+                {
+                    foreach (var it in data)
                     {
-                        foreach (var it in option.data)
+                        if (it is Files file)
                         {
-                            if (it.Value == null) continue;
-                            if (countB == 0) writeDATA.Add(startbyteOnes);
-                            else writeDATA.Add(startbytes);
-                            countB++;
-                            string separator = string.Format("Content-Disposition: form-data; name=\"{0}\"\r\n\r\n{1}", it.Key, it.Value);
-                            writeDATA.Add(encoding.GetBytes(separator));
-                        }
-                    }
-
-                    foreach (var file in option.file)
-                    {
-                        if (countB == 0) writeDATA.Add(startbyteOnes);
-                        else writeDATA.Add(startbytes);
-                        countB++;
-                        string separator = string.Format("Content-Disposition: form-data; name=\"{0}\"; filename=\"{1}\"\r\nContent-Type: {2}\r\n\r\n", file.Name, file.FileName, file.ContentType);
-                        writeDATA.Add(encoding.GetBytes(separator));
-                        writeDATA.Add(null);
-                    }
-                    writeDATA.Add(endbytes);
-
-                    #endregion
-
-                    long size = writeDATA.Sum(it => it != null ? it.Length : 0) + option.file.Sum(it => it.Size);
-                    req.ContentLength = size;
-
-                    #region 注入进度
-
-                    _requestProgresMax?.Invoke(size);
-                    if (_requestProgres == null)
-                    {
-                        using (var stream = req.GetRequestStream())
-                        {
-                            int fileIndex = 0;
-                            foreach (var it in writeDATA)
+                            using (file.Stream)
                             {
-                                if (it == null)
+                                file.Stream.Position = 0;
+                                int bytesRead = 0;
+                                byte[] buffer = new byte[Config.CacheSize];
+                                while ((bytesRead = file.Stream.Read(buffer, 0, buffer.Length)) > 0)
                                 {
-                                    var file = option.file[fileIndex];
-                                    fileIndex++;
-                                    using (file.Stream)
-                                    {
-                                        file.Stream.Position = 0;
-                                        int bytesRead = 0;
-                                        byte[] buffer = new byte[Config.CacheSize];
-                                        while ((bytesRead = file.Stream.Read(buffer, 0, buffer.Length)) > 0)
-                                        {
-                                            stream.Write(buffer, 0, bytesRead);
-                                        }
-                                    }
+                                    stream.Write(buffer, 0, bytesRead);
                                 }
-                                else stream.Write(it, 0, it.Length);
                             }
                         }
+                        else if (it is byte[] d) stream.Write(d, 0, d.Length);
                     }
-                    else
+                }
+                else if (onUploadProgress != null)
+                {
+                    long value = 0;
+                    onUploadProgress(new Progress(value, size));
+                    foreach (var it in data)
                     {
-                        long request_value = 0;
-                        _requestProgres(request_value, size);
-                        using (var stream = req.GetRequestStream())
+                        if (it is Files file)
                         {
-                            int fileIndex = 0;
-                            foreach (var it in writeDATA)
+                            using (file.Stream)
                             {
-                                if (it == null)
+                                file.Stream.Position = 0;
+                                int bytesRead = 0;
+                                byte[] buffer = new byte[Config.CacheSize];
+                                while ((bytesRead = file.Stream.Read(buffer, 0, buffer.Length)) > 0)
                                 {
-                                    var file = option.file[fileIndex];
-                                    fileIndex++;
-                                    using (file.Stream)
-                                    {
-                                        file.Stream.Position = 0;
-                                        int bytesRead = 0;
-                                        byte[] buffer = new byte[Config.CacheSize];
-                                        while ((bytesRead = file.Stream.Read(buffer, 0, buffer.Length)) > 0)
-                                        {
-                                            stream.Write(buffer, 0, bytesRead);
-                                            request_value += bytesRead;
-                                            _requestProgres(request_value, size);
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    stream.Write(it, 0, it.Length);
-                                    request_value += it.Length;
-                                    _requestProgres(request_value, size);
+                                    stream.Write(buffer, 0, bytesRead);
+                                    value += bytesRead;
+                                    onUploadProgress(new Progress(value, size));
                                 }
                             }
                         }
+                        else if (it is byte[] d)
+                        {
+                            stream.Write(d, 0, d.Length);
+                            value += d.Length;
+                            onUploadProgress(new Progress(value, size));
+                        }
                     }
-
-                    #endregion
                 }
-                else if (option.data != null && option.data.Count > 0)
+                else
                 {
-                    if (setContentType) req.ContentType = "application/x-www-form-urlencoded";
-
-                    var param_ = new List<string>(option.data.Count);
-                    foreach (var it in option.data)
+                    long value = 0;
+                    _requestProgres(value, size);
+                    foreach (var it in data)
                     {
-                        if (it.Value == null) continue;
-                        param_.Add(it.ToStringEscape());
-                    }
-
-                    var bs = encoding.GetBytes(string.Join("&", param_));
-                    req.ContentLength = bs.Length;
-                    using (var stream = req.GetRequestStream())
-                    {
-                        stream.Write(bs, 0, bs.Length);
+                        if (it is Files file)
+                        {
+                            using (file.Stream)
+                            {
+                                file.Stream.Position = 0;
+                                int bytesRead = 0;
+                                byte[] buffer = new byte[Config.CacheSize];
+                                while ((bytesRead = file.Stream.Read(buffer, 0, buffer.Length)) > 0)
+                                {
+                                    stream.Write(buffer, 0, bytesRead);
+                                    value += bytesRead;
+                                    _requestProgres(value, size);
+                                }
+                            }
+                        }
+                        else if (it is byte[] d)
+                        {
+                            stream.Write(d, 0, d.Length);
+                            value += d.Length;
+                            _requestProgres(value, size);
+                        }
                     }
                 }
             }
 
             #endregion
-
-            return req;
+        }
+        /// <summary>
+        /// 核心上传方法，用于将字节数组数据写入HTTP请求流
+        /// </summary>
+        /// <param name="req">HTTP请求对象</param>
+        /// <param name="data">要上传的字节数组数据</param>
+        /// <remarks>
+        /// 此方法是所有上传操作的核心实现，负责将数据写入HTTP请求流。
+        /// 实现原理：
+        /// 1. 设置请求的Content-Length头为数据字节长度
+        /// 2. 获取请求的写入流
+        /// 3. 将字节数组数据写入流
+        /// 4. 自动关闭流（使用using语句）
+        /// </remarks>
+        void UpCore(HttpWebRequest req, byte[] data)
+        {
+            req.ContentLength = data.Length;
+            using (var stream = req.GetRequestStream())
+            {
+                stream.Write(data, 0, data.Length);
+            }
         }
 
         #endregion

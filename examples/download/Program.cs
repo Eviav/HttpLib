@@ -1,20 +1,19 @@
-﻿// See https://aka.ms/new-console-template for more information
+// See https://aka.ms/new-console-template for more information
 
 using HttpLib;
 
 var savapath = Http.Get("https://dldir1.qq.com/qqfile/qq/QQNT/Windows/QQ_9.9.9_240422_x64_01.exe")
        .redirect()
-       .responseProgres((bytesSent, totalBytes) =>
+       .downloadProgress(e =>
        {
            Console.SetCursorPosition(0, 0);
-           if (totalBytes > 0)
+           if (e.GetProg(out var prog))
            {
-               double prog = (bytesSent * 1.0) / (totalBytes * 1.0);
-               Console.Write("{0}% 下载 {1}/{2}                  ", Math.Round(prog * 100.0, 1).ToString("N1"), CountSize(bytesSent), CountSize(totalBytes));
+               Console.Write("{0}% 下载 {1}/{2}                  ", Math.Round(prog * 100.0, 1).ToString("N1"), CountSize(e.Value), CountSize(e.MaxValue));
            }
            else
            {
-               Console.Write("{0} 下载            ", CountSize(bytesSent));
+               Console.Write("{0} 下载            ", CountSize(e.Value));
            }
        }).download(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "qq.exe");
 

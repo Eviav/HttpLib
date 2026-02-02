@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
@@ -7,12 +7,31 @@ namespace HttpLib
 {
     public class HttpOption
     {
-        public HttpOption(string url) { uri = new Uri(url); }
+        /// <summary>
+        /// 创建 HTTP 选项实例
+        /// </summary>
+        /// <param name="url">URL 地址</param>
+        public HttpOption(string url)
+        {
+            uri = new Uri(url);
+        }
+
+        /// <summary>
+        /// 创建 HTTP 选项实例
+        /// </summary>
+        /// <param name="url">URL 地址</param>
+        /// <param name="_method">请求方法</param>
         public HttpOption(string url, HttpMethod _method)
         {
             uri = new Uri(url);
             method = _method;
         }
+
+        /// <summary>
+        /// 创建 HTTP 选项实例
+        /// </summary>
+        /// <param name="_uri">URL 地址</param>
+        /// <param name="_method">请求方法</param>
         public HttpOption(Uri _uri, HttpMethod _method)
         {
             uri = _uri;

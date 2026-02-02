@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFrameworks>net4.0;net4.5;net4.6;net4.8;netstandard2.0;netstandard2.1;net6.0;net8.0;net9.0</TargetFrameworks>
+		<TargetFrameworks>net4.0;net4.5;net4.6;net4.8;netstandard2.0;netstandard2.1;net6.0;net8.0;net9.0;net10.0</TargetFrameworks>
 		<Authors>Tom</Authors>
 		<LangVersion>10.0</LangVersion>
 		<ImplicitUsings>disable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<AssemblyVersion>$(Version)</AssemblyVersion>
 		<FileVersion>$(Version)</FileVersion>
-		<Version>3.0.6</Version>
+		<Version>3.1.0</Version>
 		<Copyright>Copyright © Tom 2021-2025</Copyright>
 		<Description>便捷的HttpClient库
 支持GET/POST/PUT/Delete 上传文件/文件参数
@@ -15,17 +15,25 @@
 使用HttpWebRequest实现</Description>
 		<PackageId>Tom.HttpLib</PackageId>
 		<PackageIcon>Logo.png</PackageIcon>
-		<RepositoryUrl>https://github.com/Haku-Men/HttpLib</RepositoryUrl>
+		<RepositoryUrl>https://github.com/Eviav/HttpLib</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
 		<PackageTags>Http;HttpLib;HttpHelper;HttpClient;HttpDown;DownLoad</PackageTags>
-		<PackageProjectUrl>https://github.com/EVA-SS/HttpLib</PackageProjectUrl>
+		<PackageProjectUrl>https://github.com/Eviav/HttpLib</PackageProjectUrl>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	</PropertyGroup>
+	
 	<ItemGroup>
 		<None Include="..\Logo.png" Pack="true" PackagePath="" />
 		<None Include="..\README.md" Pack="true" PackagePath="" />
 	</ItemGroup>
+
+	<PropertyGroup Condition="'$(Pack)' == 'true'">
+		<GenerateDocumentationFile>True</GenerateDocumentationFile>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>../../key.snk</AssemblyOriginatorKeyFile>
+	</PropertyGroup>
+	
 </Project>

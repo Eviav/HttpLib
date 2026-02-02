@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Mime;
@@ -74,7 +74,7 @@ namespace HttpLib
                     }
                     catch { }
                 }
-                foreach (DirectoryInfo item in dir.GetDirectories())  DeleteDirectory(item);
+                foreach (DirectoryInfo item in dir.GetDirectories()) DeleteDirectory(item);
             }
         }
 
@@ -149,9 +149,9 @@ namespace HttpLib
                         }
                     }
                 }
-                //删除临时文件夹
-                WorkPath.DeleteDirectory();
             }
+            //删除临时文件夹
+            WorkPath.DeleteDirectory();
             return filePath;
         }
 

@@ -1,24 +1,55 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text;
 
 namespace HttpLib
 {
-    public partial class HttpCore
+    /// <summary>
+    /// HTTP 请求核心类
+    /// </summary>
+    public partial class HttpCore : IDisposable
     {
+        /// <summary>
+        /// HTTP 请求选项
+        /// </summary>
         public HttpOption option;
+
+        /// <summary>
+        /// 创建 HTTP 请求核心实例
+        /// </summary>
+        /// <param name="uri">URL 地址</param>
+        /// <param name="method">请求方法</param>
         public HttpCore(string uri, HttpMethod method)
         {
             option = new HttpOption(uri, method);
         }
+
+        /// <summary>
+        /// 创建 HTTP 请求核心实例
+        /// </summary>
+        /// <param name="uri">URL 地址</param>
+        /// <param name="method">请求方法</param>
         public HttpCore(Uri uri, HttpMethod method)
         {
             option = new HttpOption(uri, method);
         }
+
+        /// <summary>
+        /// 创建 HTTP 请求核心实例
+        /// </summary>
+        /// <param name="_option">HTTP 请求选项</param>
         public HttpCore(HttpOption _option)
         {
             option = _option;
+        }
+
+        /// <summary>
+        /// 释放资源
+        /// </summary>
+        public void Dispose()
+        {
+            abort();
         }
 
         #region 请求参(GET)
@@ -432,7 +463,7 @@ namespace HttpLib
 
         #region 缓存
 
-        CacheModel? _cache = null;
+        CacheModel? _cache;
         /// <summary>
         /// 设置缓存
         /// </summary>
@@ -482,7 +513,7 @@ namespace HttpLib
             return this;
         }
 
-        long[]? _range = null;
+        long[]? _range;
         /// <summary>
         /// 字节范围
         /// </summary>

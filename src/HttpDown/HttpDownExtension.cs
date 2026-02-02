@@ -1,4 +1,4 @@
-﻿namespace HttpLib
+namespace HttpLib
 {
     public static class HttpDownExtension
     {

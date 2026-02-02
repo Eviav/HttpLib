@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 
@@ -9,11 +9,11 @@ namespace HttpLib
     /// </summary>
     public class Config
     {
-        public static string? CacheFolder = null;
+        public static string? CacheFolder { get; set; }
 
         #region 请求头
 
-        public static List<Val>? headers = null;
+        public static List<Val>? headers { get; set; }
 
         /// <summary>
         /// 请求头
@@ -61,17 +61,17 @@ namespace HttpLib
         /// <summary>
         /// 用户标识
         /// </summary>
-        public static string UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36";
+        public static string UserAgent { get; set; } = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36";
 
         /// <summary>
         /// 表示文件压缩和解压缩编码格式，该格式将用来压缩在 System.Net.HttpWebRequest 的响应中收到的数据
         /// </summary>
-        public static DecompressionMethods DecompressionMethod = DecompressionMethods.GZip;
+        public static DecompressionMethods DecompressionMethod { get; set; } = DecompressionMethods.GZip;
 
         /// <summary>
         /// 全局是否自动重定向
         /// </summary>
-        public static bool Redirect = false;
+        public static bool Redirect { get; set; } = false;
 
         #region 全局错误
 
@@ -88,7 +88,7 @@ namespace HttpLib
 
         #region 代理
 
-        public static IWebProxy? _proxy = null;
+        public static IWebProxy? _proxy { get; set; }
 
         /// <summary>
         /// 全局代理
@@ -123,15 +123,16 @@ namespace HttpLib
 
         #endregion
 
-        public static int CacheSize = 4096;
+        public static int CacheSize { get; set; } = 4096;
 
         /// <summary>
         /// 重试次数
         /// </summary>
-        public static int RetryCount = 3;
+        public static int RetryCount { get; set; } = 3;
+
         /// <summary>
         /// 超时时长
         /// </summary>
-        public static int TimeOut = 10000;
+        public static int TimeOut { get; set; } = 10000;
     }
 }
