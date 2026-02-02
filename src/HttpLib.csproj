@@ -33,7 +33,7 @@
 	<PropertyGroup Condition="'$(Pack)' == 'true'">
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<SignAssembly>True</SignAssembly>
-		<AssemblyOriginatorKeyFile>../../key.snk</AssemblyOriginatorKeyFile>
+		<AssemblyOriginatorKeyFile>../key.snk</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
 	
 </Project>
