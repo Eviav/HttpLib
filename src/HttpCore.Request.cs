@@ -129,47 +129,8 @@ namespace HttpLib
             {
                 if (_cache != null)
                 {
-                    if (File.Exists(_cache.file))
-                    {
-                        if (_cache.t > 0)
-                        {
-                            var t = File.GetCreationTime(_cache.file);
-                            var elapsedTicks = DateTime.Now.Ticks - t.Ticks;
-                            var elapsedSpan = new TimeSpan(elapsedTicks);
-                            if (elapsedSpan.TotalMinutes < _cache.t)
-                            {
-                                switch (resultMode)
-                                {
-                                    case 1:
-                                        return new TaskResult(new ResultResponse(option.Url)
-                                        {
-                                            StatusCode = 200
-                                        }, File.ReadAllText(_cache.file));
-                                    case 2:
-                                        return new TaskResult(new ResultResponse(option.Url)
-                                        {
-                                            StatusCode = 200
-                                        }, File.ReadAllBytes(_cache.file));
-                                }
-                            }
-                        }
-                        else
-                        {
-                            switch (resultMode)
-                            {
-                                case 1:
-                                    return new TaskResult(new ResultResponse(option.Url)
-                                    {
-                                        StatusCode = 200
-                                    }, File.ReadAllText(_cache.file));
-                                case 2:
-                                    return new TaskResult(new ResultResponse(option.Url)
-                                    {
-                                        StatusCode = 200
-                                    }, File.ReadAllBytes(_cache.file));
-                            }
-                        }
-                    }
+                    var cached = ReadCache(_cache, resultMode);
+                    if (cached != null) return cached;
                 }
                 abort();
                 req = CreateRequest();
@@ -207,7 +168,7 @@ namespace HttpLib
                                         if (_cache != null)
                                         {
                                             _cache.path.CreateDirectory();
-                                            File.WriteAllText(_cache.file, result);
+                                            WriteCacheText(_cache.file, result);
                                         }
                                         return new TaskResult(_web, result);
                                     }
@@ -228,7 +189,7 @@ namespace HttpLib
                                 if (result != null && _cache != null)
                                 {
                                     _cache.path.CreateDirectory();
-                                    File.WriteAllBytes(_cache.file, result);
+                                    WriteCache(_cache.file, result);
                                 }
                                 return new TaskResult(_web, result);
                             }
@@ -278,6 +239,83 @@ namespace HttpLib
                 }
             }
         }
+
+        #region 缓存
+
+        /// <summary>
+        /// 读取缓存，读取失败（被占用/内容损坏）视为未命中，交给网络重新下载
+        /// </summary>
+        TaskResult? ReadCache(CacheModel cache, int resultMode)
+        {
+            if (resultMode != 1 && resultMode != 2) return null;
+            try
+            {
+                if (!File.Exists(cache.file)) return null;
+                if (cache.t > 0)
+                {
+                    var elapsedSpan = new TimeSpan(DateTime.Now.Ticks - File.GetCreationTime(cache.file).Ticks);
+                    if (elapsedSpan.TotalMinutes >= cache.t) return null;
+                }
+                var web = new ResultResponse(option.Url) { StatusCode = 200 };
+                if (resultMode == 1) return new TaskResult(web, File.ReadAllText(cache.file));
+                return new TaskResult(web, File.ReadAllBytes(cache.file));
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// 写缓存：先写临时文件再原子替换，避免其他线程读到写了一半的文件
+        /// </summary>
+        static void WriteCache(string file, byte[] data)
+        {
+            string tmp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllBytes(tmp, data);
+                ReplaceFile(tmp, file);
+            }
+            catch
+            {
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 写文本缓存，写入方式同上
+        /// </summary>
+        static void WriteCacheText(string file, string data)
+        {
+            string tmp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                File.WriteAllText(tmp, data);
+                ReplaceFile(tmp, file);
+            }
+            catch
+            {
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 用临时文件替换目标文件
+        /// </summary>
+        static void ReplaceFile(string tmp, string file)
+        {
+            if (File.Exists(file))
+            {
+                try { File.Replace(tmp, file, null); }
+                catch
+                {
+                    // 目标被其他线程占用时退回删除+移动，仍失败则保留旧文件
+                    File.Delete(file);
+                    File.Move(tmp, file);
+                }
+            }
+            else File.Move(tmp, file);
+        }
+
+        #endregion
 
         class TaskResult
         {
@@ -436,6 +474,15 @@ namespace HttpLib
                     }
                 }
                 _web.OriginalSize = _web.Size = response_val;
+                // 长度校验：声明了长度却没收全，视为失败，避免半截内容进入缓存
+                // （启用自动解压时 ContentLength 为 -1，此处自然跳过）
+                if (response_max > 0 && response_val != response_max)
+                {
+                    stream_read.Close();
+                    if (outfile != null) File.Delete(outfile);
+                    outfile = null;
+                    return null;
+                }
                 if (response_val > 0)
                 {
                     if (savePath == null) return GetByStream(_web, stream_read);

@@ -61,6 +61,7 @@
 * [实例全局错误捕获](#实例全局错误捕获)
 * [多线程下载](#多线程下载)
     * [基本用法](#多线程下载基本用法)
+    * [异步下载（推荐）](#异步下载推荐)
     * [高级选项](#多线程下载高级选项)
     * [下载状态与监控](#下载状态与监控)
 * [ResultResponse介绍](#ResultResponse介绍)
@@ -103,8 +104,8 @@ data(new Val("test1", "测试1"), new Val("test2", "测试2"))
 ```
 ``` csharp
 data(new List<Val> {
-	new Val("test1","测试1"),
-	new Val("test2","测试2")
+    new Val("test1","测试1"),
+    new Val("test2","测试2")
 })
 ```
 
@@ -172,7 +173,7 @@ cache("缓存id",1)
 ``` csharp
 before((HttpWebResponse response, ResultResponse result) =>
 {
-	return true; //继续请求
+    return true; //继续请求
 })
 ```
 
@@ -206,6 +207,21 @@ requestNone();//不下载流
 request();//返回字符串
 requestData();//返回字节
 download("保存目录", "保存文件名称（为空自动获取）");//下载文件
+```
+
+### 异步请求
+> net45 / netstandard2.0 及以上可用，使用异步请求与异步流读取，不占用线程等待网络。
+``` csharp
+string? html = await Http.Get("https://www.baidu.com").requestAsync();
+byte[]? bytes = await Http.Get("https://example.com/a.png").requestDataAsync();
+
+// 需要同时拿到响应头与响应体（C# 不允许 async 方法使用 out 参数）
+var result = await Http.Get("https://www.baidu.com").requestWithResponseAsync();
+Console.WriteLine(result.Response.StatusCode);
+Console.WriteLine(result.Body);
+
+// 异步下载文件，支持取消令牌
+string? file = await Http.Get(url).downloadAsync(savePath, "a.zip", cancellationToken);
 ```
 
 # 实例
@@ -294,6 +310,26 @@ var downloader = Http.Get("https://example.com/file.zip")
 // 自定义保存文件名
 string? savePath = await downloader.Go("custom-name.zip");
 ```
+
+## 异步下载（推荐）
+
+> net45 / netstandard2.0 及以上可用。`Go()` 为兼容旧版本，仍在后台线程执行同步流程；
+> `GoAsync()` 使用真正的异步请求与异步文件 IO，并支持取消令牌。
+
+``` csharp
+var downloader = Http.Get("https://example.com/large-file.zip")
+    .downLoad(Environment.GetFolderPath(Environment.SpecialFolder.Desktop))
+    .SetCacheSize(64 * 1024);
+
+using var cts = new CancellationTokenSource();
+string? savePath = await downloader.GoAsync(8, "large-file.zip", cts.Token);
+
+// 需要终止时（不可恢复）
+downloader.Stop();
+```
+
+分块采用左闭右开区间，临时文件按期望长度精确续传与合并；暂停 `Suspend()` / 恢复 `Resume()`
+在这两套实现中均可使用。终止信号能打断退避等待，避免"点了停止却还在下载"。
 
 ## 多线程下载高级选项
 

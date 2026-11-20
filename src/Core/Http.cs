@@ -90,37 +90,61 @@ namespace HttpLib
 
         #region 缓存
 
+        /// <summary>
+        /// 读取文本缓存。缓存不存在、已过期或读取失败时返回 null（视为未命中）。
+        /// </summary>
+        /// <param name="ID">缓存 id</param>
+        /// <param name="time">有效期（分钟），0 表示永不过期</param>
         public static string? Cache(this string ID, int time = 0)
         {
-            var file = Config.CacheFolder + ID;
-            if (System.IO.File.Exists(Config.CacheFolder + ID))
+            try
             {
+                var file = Config.CacheFolder + ID;
+                if (!System.IO.File.Exists(file)) return null;
                 if (time > 0)
                 {
-                    var t = System.IO.File.GetCreationTime(file);
-                    var elapsedTicks = DateTime.Now.Ticks - t.Ticks;
-                    var elapsedSpan = new TimeSpan(elapsedTicks);
-                    if (elapsedSpan.TotalMinutes < time) return System.IO.File.ReadAllText(file);
+                    var elapsedSpan = new TimeSpan(DateTime.Now.Ticks - System.IO.File.GetCreationTime(file).Ticks);
+                    if (elapsedSpan.TotalMinutes >= time) return null;
                 }
-                else return System.IO.File.ReadAllText(file);
+                return System.IO.File.ReadAllText(file);
             }
-            return null;
+            catch { return null; }
         }
+        /// <summary>
+        /// 读取字节缓存。缓存不存在、已过期或读取失败时返回 null（视为未命中）。
+        /// </summary>
+        /// <param name="ID">缓存 id</param>
+        /// <param name="time">有效期（天），0 表示永不过期</param>
         public static byte[]? CacheData(this string ID, int time = 0)
         {
-            var file = Config.CacheFolder + ID;
-            if (System.IO.File.Exists(Config.CacheFolder + ID))
+            try
             {
+                var file = Config.CacheFolder + ID;
+                if (!System.IO.File.Exists(file)) return null;
                 if (time > 0)
                 {
-                    var t = System.IO.File.GetCreationTime(file);
-                    var elapsedTicks = DateTime.Now.Ticks - t.Ticks;
-                    var elapsedSpan = new TimeSpan(elapsedTicks);
-                    if (elapsedSpan.TotalDays < time) return System.IO.File.ReadAllBytes(file);
+                    var elapsedSpan = new TimeSpan(DateTime.Now.Ticks - System.IO.File.GetCreationTime(file).Ticks);
+                    if (elapsedSpan.TotalDays >= time) return null;
                 }
-                else return System.IO.File.ReadAllBytes(file);
+                return System.IO.File.ReadAllBytes(file);
             }
-            return null;
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// 删除指定缓存
+        /// </summary>
+        /// <param name="ID">缓存id</param>
+        /// <returns>是否删除成功</returns>
+        public static bool CacheDelete(this string ID)
+        {
+            try
+            {
+                var file = Config.CacheFolder + ID;
+                if (System.IO.File.Exists(file)) System.IO.File.Delete(file);
+                return true;
+            }
+            catch { return false; }
         }
 
         #endregion

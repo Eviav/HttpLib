@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Net.Mime;
-using System.Threading;
 
 namespace HttpLib
 {
@@ -113,71 +111,6 @@ namespace HttpLib
         {
             if (disposition != null && !string.IsNullOrEmpty(disposition)) return disposition.FileNameDisposition() ?? uri.FileName();
             return uri.FileName();
-        }
-
-        /// <summary>
-        /// 文件合并函数,
-        /// 可将任意个子文件合并为一个,为fileSplit()的逆过程
-        /// delet标识是否删除原文件, change对data的首字节进行解密
-        /// </summary>
-        public static string CombineMultipleFilesIntoSingleFile(this List<string> files, string filePath, string WorkPath)
-        {
-            if (files.Count == 1)
-            {
-                if (File.Exists(filePath)) File.Delete(filePath);
-                File.Move(files[0], filePath);
-                //删除临时文件夹
-                WorkPath.DeleteDirectory();
-                return filePath;
-            }
-            using (var MergeFile = new FileStream(filePath, FileMode.Create))
-            {
-                using (var AddWriter = new BinaryWriter(MergeFile))
-                {
-                    //按序号排序
-                    int i = 0;
-                    foreach (string file in files)
-                    {
-                        i++;
-                        using (var fs = new FileStream(file, FileMode.Open))
-                        {
-                            using (var tmp = new BinaryReader(fs))
-                            {
-                                if (i == files.Count) AddWriter.Write(tmp.ReadBytes((int)fs.Length));
-                                else AddWriter.Write(tmp.ReadBytes((int)fs.Length - 1));
-                            }
-                        }
-                    }
-                }
-            }
-            //删除临时文件夹
-            WorkPath.DeleteDirectory();
-            return filePath;
-        }
-
-        public static bool Wait(this WaitHandle handle)
-        {
-            try
-            {
-                handle.WaitOne();
-                return false;
-            }
-            catch
-            {
-                return true;
-            }
-        }
-        public static bool Wait(this CancellationTokenSource? token)
-        {
-            try
-            {
-                if (token == null || token.IsCancellationRequested) return true;
-                return false;
-            }
-            catch
-            {
-                return true;
-            }
         }
     }
 }
